@@ -43,6 +43,7 @@ from ansible import constants as C
 from ansible.errors import AnsibleError, AnsibleConnectionFailure, AnsibleFileNotFound
 from ansible.plugins.connection import ConnectionBase
 from ansible.utils.path import makedirs_safe
+from ansible.utils.unicode import to_bytes
 
 try:
     from __main__ import display
@@ -149,7 +150,7 @@ class Connection(ConnectionBase):
             getattr(self._play_context, 'ssh_common_args', ''),
             getattr(self._play_context, 'ssh_args', ''),
         ]
-        if ssh_common_args is not None:
+        if ssh_args is not None:
             args = self._split_ssh_args(' '.join(ssh_args))
             for i, arg in enumerate(args):
                 if arg.lower() == 'proxycommand':
@@ -322,7 +323,7 @@ class Connection(ConnectionBase):
 
         display.vvv("PUT %s TO %s" % (in_path, out_path), host=self._play_context.remote_addr)
 
-        if not os.path.exists(in_path):
+        if not os.path.exists(to_bytes(in_path, errors='strict')):
             raise AnsibleFileNotFound("file or module does not exist: %s" % in_path)
 
         try:
@@ -331,7 +332,7 @@ class Connection(ConnectionBase):
             raise AnsibleError("failed to open a SFTP connection (%s)" % e)
 
         try:
-            self.sftp.put(in_path, out_path)
+            self.sftp.put(to_bytes(in_path, errors='strict'), to_bytes(out_path, errors='strict'))
         except IOError:
             raise AnsibleError("failed to transfer file to %s" % out_path)
 
@@ -357,7 +358,7 @@ class Connection(ConnectionBase):
             raise AnsibleError("failed to open a SFTP connection (%s)", e)
 
         try:
-            self.sftp.get(in_path, out_path)
+            self.sftp.get(to_bytes(in_path, errors='strict'), to_bytes(out_path, errors='strict'))
         except IOError:
             raise AnsibleError("failed to transfer file from %s" % in_path)
 

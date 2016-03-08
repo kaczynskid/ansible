@@ -65,7 +65,7 @@ class ResultProcess(multiprocessing.Process):
         result = None
         starting_point = self._cur_worker
         while True:
-            (worker_prc, main_q, rslt_q) = self._workers[self._cur_worker]
+            (worker_prc, rslt_q) = self._workers[self._cur_worker]
             self._cur_worker += 1
             if self._cur_worker >= len(self._workers):
                 self._cur_worker = 0
@@ -115,6 +115,8 @@ class ResultProcess(multiprocessing.Process):
                         self._send_result(('v2_playbook_item_on_skipped', result))
                     else:
                         self._send_result(('v2_playbook_item_on_ok', result))
+                        if 'diff' in result._result:
+                            self._send_result(('v2_on_file_diff', result))
                     continue
 
                 clean_copy = strip_internal_keys(result._result)

@@ -19,10 +19,8 @@ import os
 import sys
 import stat
 import time
-import array
 import shlex
 import errno
-import fcntl
 import fnmatch
 import glob
 import platform
@@ -34,7 +32,12 @@ import datetime
 import getpass
 import pwd
 import ConfigParser
-import StringIO
+
+# py2 vs py3; replace with six via ziploader
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 from string import maketrans
 
@@ -252,7 +255,7 @@ class Facts(object):
                 # load raw ini
                 cp = ConfigParser.ConfigParser()
                 try:
-                    cp.readfp(StringIO.StringIO(out))
+                    cp.readfp(StringIO(out))
                 except ConfigParser.Error:
                     fact = "error loading fact - please check content"
                 else:
@@ -759,7 +762,8 @@ class Facts(object):
             if len(tokens) == 0:
                 continue
             if tokens[0] == 'nameserver':
-                self.facts['dns']['nameservers'] = []
+                if not 'nameservers' in self.facts['dns']:
+                    self.facts['dns']['nameservers'] = []
                 for nameserver in tokens[1:]:
                     self.facts['dns']['nameservers'].append(nameserver)
             elif tokens[0] == 'domain':
@@ -803,9 +807,12 @@ class Facts(object):
             },
             'version_info': list(sys.version_info),
             'executable': sys.executable,
-            'type': sys.subversion[0],
             'has_sslcontext': HAS_SSLCONTEXT
         }
+        try:
+            self.facts['python']['type'] = sys.subversion[0]
+        except AttributeError:
+            self.facts['python']['type'] = None
 
 
 class Hardware(Facts):

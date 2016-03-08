@@ -188,7 +188,7 @@ class TaskExecutor:
                     except AnsibleUndefinedVariable as e:
                         loop_terms = []
                         display.deprecated("Skipping task due to undefined Error, in the future this will be a fatal error.: %s" % to_bytes(e))
-                items = self._shared_loader_obj.lookup_loader.get(self._task.loop, loader=self._loader, templar=templar).run(terms=loop_terms, variables=self._job_vars)
+                items = self._shared_loader_obj.lookup_loader.get(self._task.loop, loader=self._loader, templar=templar).run(terms=loop_terms, variables=self._job_vars, wantlist=True)
             else:
                 raise AnsibleError("Unexpected failure in finding the lookup named '%s' in the available lookup plugins" % self._task.loop)
 
@@ -269,34 +269,40 @@ class TaskExecutor:
         if len(items) > 0 and task_action in self.SQUASH_ACTIONS:
             if all(isinstance(o, string_types) for o in items):
                 final_items = []
-                name = self._task.args.pop('name', None) or self._task.args.pop('pkg', None)
+
+                name = None
+                for allowed in ['name', 'pkg', 'package']:
+                    name = self._task.args.pop(allowed, None)
+                    if name is not None:
+                        break
 
                 # This gets the information to check whether the name field
                 # contains a template that we can squash for
                 template_no_item = template_with_item = None
-                if templar._contains_vars(name):
-                    variables['item'] = '\0$'
-                    template_no_item = templar.template(name, variables, cache=False)
-                    variables['item'] = '\0@'
-                    template_with_item = templar.template(name, variables, cache=False)
-                    del variables['item']
+                if name:
+                    if templar._contains_vars(name):
+                        variables['item'] = '\0$'
+                        template_no_item = templar.template(name, variables, cache=False)
+                        variables['item'] = '\0@'
+                        template_with_item = templar.template(name, variables, cache=False)
+                        del variables['item']
 
-                # Check if the user is doing some operation that doesn't take
-                # name/pkg or the name/pkg field doesn't have any variables
-                # and thus the items can't be squashed
-                if name and (template_no_item != template_with_item):
-                    for item in items:
-                        variables['item'] = item
-                        if self._task.evaluate_conditional(templar, variables):
-                            new_item = templar.template(name, cache=False)
-                            final_items.append(new_item)
-                    self._task.args['name'] = final_items
-                    # Wrap this in a list so that the calling function loop
-                    # executes exactly once
-                    return [final_items]
-                else:
-                    # Restore the name parameter
-                    self._task.args['name'] = name
+                    # Check if the user is doing some operation that doesn't take
+                    # name/pkg or the name/pkg field doesn't have any variables
+                    # and thus the items can't be squashed
+                    if template_no_item != template_with_item:
+                        for item in items:
+                            variables['item'] = item
+                            if self._task.evaluate_conditional(templar, variables):
+                                new_item = templar.template(name, cache=False)
+                                final_items.append(new_item)
+                        self._task.args['name'] = final_items
+                        # Wrap this in a list so that the calling function loop
+                        # executes exactly once
+                        return [final_items]
+                    else:
+                        # Restore the name parameter
+                        self._task.args['name'] = name
             #elif:
                 # Right now we only optimize single entries.  In the future we
                 # could optimize more types:

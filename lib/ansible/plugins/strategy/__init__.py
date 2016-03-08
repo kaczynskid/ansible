@@ -153,7 +153,7 @@ class StrategyBase:
 
             queued = False
             while True:
-                (worker_prc, main_q, rslt_q) = self._workers[self._cur_worker]
+                (worker_prc, rslt_q) = self._workers[self._cur_worker]
                 if worker_prc is None or not worker_prc.is_alive():
                     worker_prc = WorkerProcess(rslt_q, task_vars, host, task, play_context, self._loader, self._variable_manager, shared_loader_obj)
                     self._workers[self._cur_worker][0] = worker_prc
@@ -331,6 +331,9 @@ class StrategyBase:
                                 self._variable_manager.set_host_facts(target_host, facts)
                 elif result[0].startswith('v2_playbook_item') or result[0] == 'v2_playbook_retry':
                     self._tqm.send_callback(result[0], result[1])
+                elif result[0] == 'v2_on_file_diff':
+                    if self._diff:
+                        self._tqm.send_callback('v2_on_file_diff', result[1])
                 else:
                     raise AnsibleError("unknown result message received: %s" % result[0])
 

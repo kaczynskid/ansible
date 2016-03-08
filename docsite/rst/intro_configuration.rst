@@ -228,7 +228,7 @@ Allows disabling of deprecating warnings in ansible-playbook output::
 
 Deprecation warnings indicate usage of legacy features that are slated for removal in a future release of Ansible.
 
-.. _display_args_to_stdout
+.. _display_args_to_stdout:
 
 display_args_to_stdout
 ======================
@@ -600,6 +600,20 @@ Additional paths can be provided separated by colon characters, in the same way 
 Roles will be first searched for in the playbook directory.  Should a role not be found, it will indicate all the possible paths
 that were searched.
 
+.. _strategy_plugins:
+
+strategy_plugins
+==================
+
+Strategy plugin allow users to change the way in which Ansible runs tasks on targeted hosts.
+
+This is a developer-centric feature that allows low-level extensions around Ansible to be loaded from
+different locations::
+
+    strategy_plugins = ~/.ansible/plugins/strategy_plugins/:/usr/share/ansible_plugins/strategy_plugins
+
+Most users will not need to use this feature.  See :doc:`developing_plugins` for more details
+
 .. _sudo_exe:
 
 sudo_exe
@@ -768,7 +782,7 @@ instead.  Setting it to False will improve performance and is recommended when h
 
     record_host_keys=True
 
-.. _paramiko_proxy_command
+.. _paramiko_proxy_command:
 
 proxy_command
 =============
