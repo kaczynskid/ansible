@@ -71,6 +71,9 @@ There's a useful test script in the source checkout for ansible::
     source ansible/hacking/env-setup
     chmod +x ansible/hacking/test-module
 
+For instructions on setting up ansible from source, please see
+:doc:`intro_installation`.
+
 Let's run the script you just wrote with that::
 
     ansible/hacking/test-module -m ./timetest.py
@@ -381,6 +384,8 @@ Include it in your module file like this::
     # ... snip ...
     '''
 
+If an argument takes both C(True)/C(False) and C(Yes)/C(No), the documentation should use C(True) and C(False). 
+
 The ``description``, and ``notes`` fields
 support formatting with some special macros.
 
@@ -495,6 +500,7 @@ Module checklist
     * Does module use check_mode? Could it be modified to use it? Document it
     * Examples: make sure they are reproducible
     * Return: document the return structure of the module
+    * If an argument takes both C(True)/C(False) and C(Yes)/C(No), the documentation should use C(True) and C(False). 
 * Exceptions: The module must handle them. (exceptions are bugs)
     * Give out useful messages on what you were doing and you can add the exception message to that.
     * Avoid catchall exceptions, they are not very useful unless the underlying API gives very good error messages pertaining the attempted action.

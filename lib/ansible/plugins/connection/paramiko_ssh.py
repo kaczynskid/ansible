@@ -126,10 +126,7 @@ SFTP_CONNECTION_CACHE = {}
 class Connection(ConnectionBase):
     ''' SSH based connections with Paramiko '''
 
-    @property
-    def transport(self):
-        ''' used to identify this connection object from other classes '''
-        return 'paramiko'
+    transport = 'paramiko'
 
     def _cache_key(self):
         return "%s__%s__" % (self._play_context.remote_addr, self._play_context.remote_user)
@@ -269,11 +266,13 @@ class Connection(ConnectionBase):
 
         # sudo usually requires a PTY (cf. requiretty option), therefore
         # we give it one by default (pty=True in ansble.cfg), and we try
-        # to initialise from the calling environment
-        if C.PARAMIKO_PTY:
+        # to initialise from the calling environment when sudoable is enabled
+        if C.PARAMIKO_PTY and sudoable:
             chan.get_pty(term=os.getenv('TERM', 'vt100'), width=int(os.getenv('COLUMNS', 0)), height=int(os.getenv('LINES', 0)))
 
         display.vvv("EXEC %s" % cmd, host=self._play_context.remote_addr)
+
+        cmd = to_bytes(cmd, errors='strict')
 
         no_prompt_out = ''
         no_prompt_err = ''

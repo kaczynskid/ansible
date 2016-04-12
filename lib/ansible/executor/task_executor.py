@@ -75,7 +75,9 @@ class TaskExecutor:
     def run(self):
         '''
         The main executor entrypoint, where we determine if the specified
-        task requires looping and either runs the task with
+        task requires looping and either runs the task with self._run_loop()
+        or self._execute(). After that, the returned results are parsed and
+        returned as a dict.
         '''
 
         display.debug("in run()")
@@ -186,8 +188,8 @@ class TaskExecutor:
                     try:
                         loop_terms = listify_lookup_plugin_terms(terms=self._task.loop_args, templar=templar, loader=self._loader, fail_on_undefined=True, convert_bare=True)
                     except AnsibleUndefinedVariable as e:
-                        loop_terms = []
                         display.deprecated("Skipping task due to undefined Error, in the future this will be a fatal error.: %s" % to_bytes(e))
+                        return None
                 items = self._shared_loader_obj.lookup_loader.get(self._task.loop, loader=self._loader, templar=templar).run(terms=loop_terms, variables=self._job_vars, wantlist=True)
             else:
                 raise AnsibleError("Unexpected failure in finding the lookup named '%s' in the available lookup plugins" % self._task.loop)
@@ -452,19 +454,20 @@ class TaskExecutor:
 
             # helper methods for use below in evaluating changed/failed_when
             def _evaluate_changed_when_result(result):
-                if self._task.changed_when is not None:
+                if self._task.changed_when is not None and self._task.changed_when:
                     cond = Conditional(loader=self._loader)
-                    cond.when = [ self._task.changed_when ]
+                    cond.when = self._task.changed_when
                     result['changed'] = cond.evaluate_conditional(templar, vars_copy)
 
             def _evaluate_failed_when_result(result):
-                if self._task.failed_when is not None:
+                if self._task.failed_when:
                     cond = Conditional(loader=self._loader)
-                    cond.when = [ self._task.failed_when ]
+                    cond.when = self._task.failed_when
                     failed_when_result = cond.evaluate_conditional(templar, vars_copy)
                     result['failed_when_result'] = result['failed'] = failed_when_result
-                    return failed_when_result
-                return False
+                else:
+                    failed_when_result = False
+                return failed_when_result
 
             if 'ansible_facts' in result:
                 vars_copy.update(result['ansible_facts'])
@@ -482,7 +485,7 @@ class TaskExecutor:
 
             if attempt < retries - 1:
                 cond = Conditional(loader=self._loader)
-                cond.when = [ self._task.until ]
+                cond.when = self._task.until
                 if cond.evaluate_conditional(templar, vars_copy):
                     break
                 else:
@@ -604,7 +607,8 @@ class TaskExecutor:
                 try:
                     cmd = subprocess.Popen(['ssh','-o','ControlPersist'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     (out, err) = cmd.communicate()
-                    if "Bad configuration option" in err or "Usage:" in err:
+                    err = to_unicode(err)
+                    if u"Bad configuration option" in err or u"Usage:" in err:
                         conn_type = "paramiko"
                 except OSError:
                     conn_type = "paramiko"
@@ -642,7 +646,9 @@ class TaskExecutor:
             try:
                 connection._connect()
             except AnsibleConnectionFailure:
+                display.debug('connection failed, fallback to accelerate')
                 res = handler._execute_module(module_name='accelerate', module_args=accelerate_args, task_vars=variables, delete_remote_tmp=False)
+                display.debug(res)
                 connection._connect()
 
         return connection
