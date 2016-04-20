@@ -194,6 +194,8 @@ class PlaybookExecutor:
         finally:
             if self._tqm is not None:
                 self._tqm.cleanup()
+            if self._loader:
+                self._loader.cleanup_all_tmp_files()
 
         if self._options.syntax:
             display.display("No issues encountered")
@@ -214,7 +216,7 @@ class PlaybookExecutor:
         # and convert it to an integer value based on the number of hosts
         if isinstance(play.serial, string_types) and play.serial.endswith('%'):
             serial_pct = int(play.serial.replace("%",""))
-            serial = int((serial_pct/100.0) * len(all_hosts))
+            serial = int((serial_pct/100.0) * len(all_hosts)) or 1
         else:
             if play.serial is None:
                 serial = -1

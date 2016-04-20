@@ -122,7 +122,7 @@
     state: absent
 
 - name: test https fetch to a site with mismatched hostname and certificate and validate_certs=no
-  get_url:
+  uri:
     url: "https://www.kennethreitz.org/"
     dest: "{{ output_dir }}/kreitz.html"
     validate_certs: no
@@ -279,3 +279,10 @@
     state: absent
   with_items: "{{ uri_os_packages[ansible_os_family] }}"
   when: not ansible_python.has_sslcontext and not is_ubuntu_precise|bool
+
+- name: validate the status_codes are correct
+  uri:
+    url: https://httpbin.org/status/202
+    status_code: 202
+    method: POST
+    body: foo

@@ -126,8 +126,8 @@ class Facts(object):
                     ('/etc/alpine-release', 'Alpine'),
                     ('/etc/release', 'Solaris'),
                     ('/etc/arch-release', 'Archlinux'),
-                    ('/etc/SuSE-release', 'SuSE'),
                     ('/etc/os-release', 'SuSE'),
+                    ('/etc/SuSE-release', 'SuSE'),
                     ('/etc/gentoo-release', 'Gentoo'),
                     ('/etc/os-release', 'Debian'),
                     ('/etc/lsb-release', 'Mandriva'),
@@ -173,6 +173,7 @@ class Facts(object):
             self.get_cmdline()
             self.get_public_ssh_host_keys()
             self.get_selinux_facts()
+            self.get_caps_facts()
             self.get_fips_facts()
             self.get_pkg_mgr_facts()
             self.get_service_mgr_facts()
@@ -183,6 +184,7 @@ class Facts(object):
             self.get_env_facts()
             self.get_dns_facts()
             self.get_python_facts()
+
 
     def populate(self):
         return self.facts
@@ -280,6 +282,11 @@ class Facts(object):
     # platform.dist() is deprecated in 2.6
     # in 2.6 and newer, you should use platform.linux_distribution()
     def get_distribution_facts(self):
+        """
+        Fills facts about the distribution name and version.
+
+        This is unit tested. Please extend the tests to cover all distributions if you have them available.
+        """
 
         # A list with OS Family members
         OS_FAMILY = dict(
@@ -351,7 +358,7 @@ class Facts(object):
                                 self.facts['distribution'] = name
                             else:
                                 self.facts['distribution'] = data.split()[0]
-                            break  
+                            break
                         elif name == 'Slackware':
                             data = get_file_content(path)
                             if 'Slackware' in data:
@@ -359,7 +366,7 @@ class Facts(object):
                                 version = re.findall('\w+[.]\w+', data)
                                 if version:
                                     self.facts['distribution_version'] = version[0]
-                            break      
+                            break
                         elif name == 'OracleLinux':
                             data = get_file_content(path)
                             if 'Oracle Linux' in data:
@@ -457,7 +464,7 @@ class Facts(object):
                                                 self.facts['distribution_release'] = release.groups()[0]
                                         elif 'enterprise' in data.lower() and 'VERSION_ID' in line:
                                              release = re.search('^VERSION_ID="?[0-9]+\.?([0-9]*)"?', line) # SLES doesn't got funny release names
-                                             if release.group(1):
+                                             if release and release.group(1):
                                                  release = release.group(1)
                                              else:
                                                  release = "0" # no minor number, so it is the first release
@@ -519,9 +526,11 @@ class Facts(object):
 
                             if self.facts['distribution'].lower() == 'coreos':
                                 data = get_file_content('/etc/coreos/update.conf')
-                                release = re.search("^GROUP=(.*)", data)
-                                if release:
-                                    self.facts['distribution_release'] = release.group(1).strip('"')
+                                if data:
+                                    release = re.search("^GROUP=(.*)", data)
+                                    if release:
+                                        self.facts['distribution_release'] = release.group(1).strip('"')
+
                     else:
                         self.facts['distribution'] = name
         machine_id = get_file_content("/var/lib/dbus/machine-id") or get_file_content("/etc/machine-id")
@@ -696,6 +705,25 @@ class Facts(object):
                     self.facts['selinux']['type'] = 'unknown'
             except OSError:
                 self.facts['selinux']['type'] = 'unknown'
+
+    def get_caps_facts(self):
+        capsh_path = self.module.get_bin_path('capsh')
+        if capsh_path:
+            rc, out, err = self.module.run_command([capsh_path, "--print"])
+            enforced_caps = []
+            enforced = 'NA'
+            for line in out.split('\n'):
+                if len(line) < 1:
+                    continue
+                if line.startswith('Current:'):
+                    if line.split(':')[1].strip() == '=ep':
+                        enforced = 'False'
+                    else:
+                        enforced = 'True'
+                        enforced_caps = [i.strip() for i in line.split('=')[1].split(',')]
+
+            self.facts['system_capabilities_enforced'] = enforced
+            self.facts['system_capabilities'] = enforced_caps
 
 
     def get_fips_facts(self):
@@ -1083,6 +1111,19 @@ class LinuxHardware(Hardware):
     def get_mount_facts(self):
         uuids = dict()
         self.facts['mounts'] = []
+        bind_mounts = []
+        findmntPath = self.module.get_bin_path("findmnt")
+        if findmntPath:
+            rc, out, err = self.module.run_command("%s -lnur" % ( findmntPath ), use_unsafe_shell=True)
+            if rc == 0:
+                # find bind mounts, in case /etc/mtab is a symlink to /proc/mounts
+                for line in out.split('\n'):
+                    fields = line.rstrip('\n').split()
+                    if(len(fields) < 2):
+                        continue
+                    if(re.match(".*\]",fields[1])):
+                        bind_mounts.append(fields[0])
+
         mtab = get_file_content('/etc/mtab', '')
         for line in mtab.split('\n'):
             fields = line.rstrip('\n').split()
@@ -1100,6 +1141,11 @@ class LinuxHardware(Hardware):
                             if rc == 0:
                                 uuid = out.strip()
                                 uuids[fields[0]] = uuid
+
+                    if fields[1] in bind_mounts:
+                        # only add if not already there, we might have a plain /etc/mtab
+                        if not re.match(".*bind.*", fields[3]):
+                            fields[3] += ",bind"
 
                     self.facts['mounts'].append(
                         {'mount': fields[1],

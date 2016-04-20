@@ -19,15 +19,16 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
-from ansible.compat.six.moves import queue as Queue
-from ansible.compat.six import iteritems, text_type, string_types
-
 import json
 import time
 import zlib
+from collections import defaultdict
+from multiprocessing import Lock
 
 from jinja2.exceptions import UndefinedError
 
+from ansible.compat.six.moves import queue as Queue
+from ansible.compat.six import iteritems, text_type, string_types
 from ansible import constants as C
 from ansible.errors import AnsibleError, AnsibleParserError, AnsibleUndefinedVariable
 from ansible.executor.play_iterator import PlayIterator
@@ -50,6 +51,8 @@ except ImportError:
     display = Display()
 
 __all__ = ['StrategyBase']
+
+action_write_locks = defaultdict(Lock)
 
 
 # TODO: this should probably be in the plugins/__init__.py, with
@@ -140,6 +143,20 @@ class StrategyBase:
         ''' handles queueing the task up to be sent to a worker '''
 
         display.debug("entering _queue_task() for %s/%s" % (host, task))
+
+         # Add a write lock for tasks.
+         # Maybe this should be added somewhere further up the call stack but
+         # this is the earliest in the code where we have task (1) extracted
+         # into its own variable and (2) there's only a single code path
+         # leading to the module being run.  This is called by three
+         # functions: __init__.py::_do_handler_run(), linear.py::run(), and
+         # free.py::run() so we'd have to add to all three to do it there.
+         # The next common higher level is __init__.py::run() and that has
+         # tasks inside of play_iterator so we'd have to extract them to do it
+         # there.
+        if not action_write_locks[task.action]:
+            display.warning('Python defaultdict did not create the Lock for us.  Creating manually')
+            action_write_locks[task.action] = Lock()
 
         # and then queue the new task
         display.debug("%s - putting task (%s) in queue" % (host, task))
@@ -314,9 +331,12 @@ class StrategyBase:
                     # be a host that is not really in inventory at all
                     if task.delegate_to is not None and task.delegate_facts:
                         task_vars = self._variable_manager.get_vars(loader=self._loader, play=iterator._play, host=host, task=task)
-                        self.add_tqm_variables(task_vars, play=iterator._play)
+                        task_vars = self.add_tqm_variables(task_vars, play=iterator._play)
+                        loop_var = 'item'
+                        if task.loop_control:
+                            loop_var = task.loop_control.loop_var or 'item'
                         if item is not None:
-                            task_vars['item'] = item
+                            task_vars[loop_var] = item
                         templar = Templar(loader=self._loader, variables=task_vars)
                         host_name = templar.template(task.delegate_to)
                         actual_host = self._inventory.get_host(host_name)
@@ -382,10 +402,9 @@ class StrategyBase:
 
         host_name = host_info.get('host_name')
 
-        # Check if host in cache, add if not
-        if host_name in self._inventory._hosts_cache:
-            new_host = self._inventory._hosts_cache[host_name]
-        else:
+        # Check if host in inventory, add if not
+        new_host = self._inventory.get_host(host_name)
+        if not new_host:
             new_host = Host(name=host_name)
             self._inventory._hosts_cache[host_name] = new_host
 

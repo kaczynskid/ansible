@@ -1,19 +1,25 @@
 Ansible Changes By Release
 ==========================
 
-## 2.1 TBD - ACTIVE DEVELOPMENT
+## 2.1 "The Song Remains the Same" - ACTIVE DEVELOPMENT
 
 ###Major Changes:
 
-* added facility for modules to send back 'diff' for display when ansible is called with --diff, updated several modules to return this info
-* added ansible-console tool, a REPL shell that allows running adhoc tasks against a chosen inventory (based on  https://github.com/dominis/ansible-shell)
-* new meta action, `meta: clear_facts` which will remove existing facts for the current host from current memory and facts cache.
+* Added the ability to specify includes as "static" (either through a configuration option or on a per-include basis). When includes are static,
+  they are loaded at compile time and cannot contain dynamic features like loops.
+* Added a new option for tasks: `loop_control`. This currently only supports one option - `loop_var`, which allows a different loop variable from `item` to be used.
+* Added the ability to send per-item callbacks, rather than a batch update (this more closely resembles the behavior of Ansible 1.x).
+* Added facility for modules to send back 'diff' for display when ansible is called with --diff, updated several modules to return this info
+* Added ansible-console tool, a REPL shell that allows running adhoc tasks against a chosen inventory (based on  https://github.com/dominis/ansible-shell)
+* New meta action, `meta: clear_facts` which will remove existing facts for the current host from current memory and facts cache.
+* copy module can now transparently use a vaulted file as source, if vault passwords were provided it will decrypt and copy on the fly.
 
 ####New Modules:
 - aws
   * ec2_vol_facts
   * ec2_vpc_dhcp_options
   * ec2_vpc_net_facts
+  * ec2_snapshot_facts
 - cloudflare_dns
 - cloudstack
   * cs_cluster
@@ -24,6 +30,10 @@ Ansible Changes By Release
   * cs_volume
   * cs_zone
   * cs_zone_facts
+- gitlab
+  * gitlab_group
+  * gitlab_project
+  * gitlab_user
 - make
 - openstack
   * os_flavor_facts
@@ -31,10 +41,13 @@ Ansible Changes By Release
   * os_ironic_inspect
   * os_keystone_domain_facts
   * os_keystone_role
+  * os_port_facts
+  * os_project_facts
   * os_user_facts
   * os_user_role
 - softlayer
   * sl_vm
+- vmware_maintenancemode
 - windows
   * win_owner
   * win_regmerge

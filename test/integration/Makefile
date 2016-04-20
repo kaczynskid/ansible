@@ -96,7 +96,7 @@ TEST_CONNECTION_FILTER += !chroot
 endif
 
 # Connection plugin test command to repeat with each locale setting.
-TEST_CONNECTION_CMD = $(1) ansible-playbook test_connection.yml -i test_connection.inventory -l '$(TEST_CONNECTION_FILTER)' -v $(TEST_FLAGS)
+TEST_CONNECTION_CMD = $(1) ansible-playbook test_connection.yml -i test_connection.inventory -l '$(TEST_CONNECTION_FILTER)' $(TEST_FLAGS)
 
 test_connection: setup
 	$(call TEST_CONNECTION_CMD)
@@ -144,10 +144,10 @@ test_var_precedence: setup
 	ansible-playbook test_var_precedence.yml -i $(INVENTORY) $(CREDENTIALS_ARG) $(TEST_FLAGS) -v -e outputdir=$(TEST_DIR) -e 'extra_var=extra_var' -e 'extra_var_override=extra_var_override'
 
 test_vault: setup
-	ansible-playbook test_vault.yml -i $(INVENTORY) $(CREDENTIALS_ARG) -v $(TEST_FLAGS) --vault-password-file $(VAULT_PASSWORD_FILE) --list-tasks -e outputdir=$(TEST_DIR)
-	ansible-playbook test_vault.yml -i $(INVENTORY) $(CREDENTIALS_ARG) -v $(TEST_FLAGS) --vault-password-file $(VAULT_PASSWORD_FILE) --list-hosts -e outputdir=$(TEST_DIR)
-	ansible-playbook test_vault.yml -i $(INVENTORY) $(CREDENTIALS_ARG) -v $(TEST_FLAGS) --vault-password-file $(VAULT_PASSWORD_FILE) --syntax-check -e outputdir=$(TEST_DIR)
-	ansible-playbook test_vault.yml -i $(INVENTORY) $(CREDENTIALS_ARG) -v $(TEST_FLAGS) --vault-password-file $(VAULT_PASSWORD_FILE) -e outputdir=$(TEST_DIR)
+	ansible-playbook test_vault.yml -i $(INVENTORY) $(CREDENTIALS_ARG) -v $(TEST_FLAGS) --vault-password-file $(VAULT_PASSWORD_FILE) --list-tasks -e outputdir=$(TEST_DIR) -e @$(VARS_FILE)
+	ansible-playbook test_vault.yml -i $(INVENTORY) $(CREDENTIALS_ARG) -v $(TEST_FLAGS) --vault-password-file $(VAULT_PASSWORD_FILE) --list-hosts -e outputdir=$(TEST_DIR)  -e @$(VARS_FILE)
+	ansible-playbook test_vault.yml -i $(INVENTORY) $(CREDENTIALS_ARG) -v $(TEST_FLAGS) --vault-password-file $(VAULT_PASSWORD_FILE) --syntax-check -e outputdir=$(TEST_DIR)  -e @$(VARS_FILE)
+	ansible-playbook test_vault.yml -i $(INVENTORY) $(CREDENTIALS_ARG) -v $(TEST_FLAGS) --vault-password-file $(VAULT_PASSWORD_FILE) -e outputdir=$(TEST_DIR) -e @$(VARS_FILE)
 
 # test_delegate_to does not work unless we have permission to ssh to localhost.
 # Would take some more effort on our test systems to implement that -- probably
